@@ -1,5 +1,5 @@
 #include "cudaLib.cuh"
-#define TILE_SIZE 6
+#define TILE_SIZE 3
 
 void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
 {
@@ -73,9 +73,6 @@ double estimatePi(uint64_t generateThreadCount, uint64_t sampleSize,
 	return approxPi;
 }
 
-
-
-
 int runGpuMedianFilter (std::string imgPath, std::string outPath, MedianFilterArgs args) {
 	
 	std::cout << "Lazy, you are! ... ";
@@ -93,9 +90,71 @@ int medianFilter_gpu (uint8_t inPixels, ImageDim imgDim,
 
 int runGpuConv (int argc, char ** argv) {
 
+	
+	
 	TensorShape iShape = AlexL1_InShape;
 	TensorShape fShape = AlexL1_FilterShape;
 	ConvLayerArgs convArgs = AlexL1_ConvArgs;
+	
+	
+	int maxSharedMemPerBlock;
+	cudaDeviceGetAttribute(&maxSharedMemPerBlock, cudaDevAttrMaxSharedMemoryPerBlock, 0);
+	std::cout << "Max shared memory per block: " << maxSharedMemPerBlock << "\n";
+
+
+	int choice; 
+
+	std::cout << "Which Layer do you want, choose 1-6!\n";
+	std::cin >> choice;
+
+	std::cout << "\n";
+	std::cout << "Choice selected - " << choice << "\n\n";
+	switch (choice) {
+
+		case 1:
+			std::cout << "Running Alex Net L1!\n";
+			iShape = AlexL1_InShape;
+			fShape = AlexL1_FilterShape;
+			convArgs = AlexL1_ConvArgs;
+			break;
+		case 2:
+			std::cout << "Running Alex Net L2!\n";
+			iShape = AlexL2_InShape;
+			fShape = AlexL2_FilterShape;
+			convArgs = AlexL2_ConvArgs;
+			break;
+		case 3:
+			std::cout << "Running Alex Net L3!\n";
+			iShape = AlexL3_InShape;
+			fShape = AlexL3_FilterShape;
+			convArgs = AlexL3_ConvArgs;
+			break;
+		case 4:
+			std::cout << "Running Alex Net L4!\n";
+			iShape = AlexL4_InShape;
+			fShape = AlexL4_FilterShape;
+			convArgs = AlexL4_ConvArgs;
+			break;
+		case 5:
+			std::cout << "Running Alex Net L5!\n";
+			iShape = AlexL5_InShape;
+			fShape = AlexL5_FilterShape;
+			convArgs = AlexL5_ConvArgs;
+			break;
+		case 6:
+			std::cout << "Running Alex Net L6!\n";
+			iShape = AlexL6_InShape;
+			fShape = AlexL6_FilterShape;
+			convArgs = AlexL6_ConvArgs;
+			break;
+		default:
+			std::cout << "Defaulting to running Alex Net L1!\n";
+			iShape = AlexL1_InShape;
+			fShape = AlexL1_FilterShape;
+			convArgs = AlexL1_ConvArgs;
+			break;
+
+	}
 
 	std::cout << "Evaluate convolution : \n";
 	std::cout << "Input : " << iShape << " \n";
@@ -172,10 +231,13 @@ int executeGpuConv(TensorShape iShape, TensorShape fShape,
 
 	size_t sharedMemSize = (iShape.channels * (shared_window_height) * (shared_window_width)) * sizeof(float); // 4B*(3*31*31) = 11,5KB
 
+	
+
 	/*ConvLayer Kernel Call*/
 	//convLayer_gpu << <gridDim, blockDim >> > (d_in, iShape, d_filter, fShape, d_bias, d_out, oShape, args);
 	std::cout << "\n\n GPU Starting!\n\n\n";
 	std::cout << "Bias[0] = " << h_bias[0] << "\n";
+	std::cout << "Memory Size: " << ((iShape.channels * (shared_window_height) * (shared_window_width)) * 4) << " Bytes! \n";
 	convLayer_gpu_SM_DM_v3 << <gridDim, blockDim, sharedMemSize >> > (d_in, iShape, d_filter, fShape, d_bias, d_out, oShape, args);
 	cudaError_t err = cudaGetLastError();
 	if (err != cudaSuccess) {
@@ -186,27 +248,14 @@ int executeGpuConv(TensorShape iShape, TensorShape fShape,
 		std::cout << "CUDA Error: " << cudaGetErrorString(err) << "\n";
 	}
 
-	
-	//cudaDeviceSynchronize();
-
 	/*CUDA memcpy for d_out to d_in*/
 	cudaMemcpy(h_out, d_out, tensorSize(oShape) * sizeof(float), cudaMemcpyDeviceToHost);
-
-
-	/*
-	
-	for (uint32_t i = 1100; i < 1111;++i) {
-		std::cout << "Output at " << i << ": " << h_out[i] << "\n";
-	}
-	std::cout << "CPU NEXT \n";
-
-	*/
 
 	std::cout << "\n Comparing CPU and GPU now...\n";
 
 	float* cpu_out = executeCpuConv2(iShape, fShape, oShape, args);
 	int verify_errors = verifyVector_convLayer(cpu_out, h_out, (oShape.height * oShape.width * oShape.channels));
-	std::cout << "\nFound " << verify_errors << "Errors...\n";
+	std::cout << "\nFound " << verify_errors << " Errors...\n";
 
 	/* cudaFree() functions */
 	cudaFree(d_in);

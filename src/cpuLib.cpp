@@ -39,10 +39,11 @@ int verifyVector_convLayer(float* a, float* b, int size) {
 		float delta = a[idx] - b[idx];
 		if (abs(delta) > tolerance) {
 			++errorCount;
-			std::cout << "Idx " << idx << " expected (CPU):  " << a[idx] << " found (GPU):" << b[idx] << " Delta: " << abs(delta) << "\n";
+			//std::cout << "Idx " << idx << " expected (CPU):  " << a[idx] << " found (GPU):" << b[idx] << " Delta: " << abs(delta) << "\n";
 		}
 		if (idx >= 0 && idx < 20) {
-			std::cout << "Idx " << idx << " expected (CPU):  " << a[idx] << " found (GPU):" << b[idx] << "\n";
+			/*Range of IDX Checking*/
+			//std::cout << "Idx " << idx << " expected (CPU):  " << a[idx] << " found (GPU):" << b[idx] << "\n";
 		}
 	}
 	return errorCount;
@@ -503,10 +504,6 @@ int executeCpuConv (TensorShape iShape, TensorShape fShape,
 	std::cout << "Bias[0] = " << bias[0] << "\n";
 	convLayer_cpu(in, iShape, filter, fShape, bias, out, oShape, args);
 
-	for (uint32_t i = 1100; i < 1111;++i) {
-		std::cout << "Output at " << i << ": " << out[i] << "\n";
-	}
-
 	free(in);
 	free(filter);
 	free(bias);
@@ -597,9 +594,7 @@ int convLayer_cpu( float * input, TensorShape iShape,
 								}
 							}
 						}
-						if (n == 0 &&  m == 0 &&  x == 0 && y == 2) {
-							printf("After channel %d, sum = %f\n", k, output[out_idx]);
-						}
+						
 					}
 					//	STUDENT: Check by disabling activation
 					//	STUDENT: Apply Activation here

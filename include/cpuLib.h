@@ -131,6 +131,26 @@
 	const TensorShape AlexL1_FilterShape	= {96, 3, 11, 11};
 	const ConvLayerArgs AlexL1_ConvArgs 	= {0, 0, 4, 4, false};
 
+	const TensorShape AlexL2_InShape		= { 1, 96, 27, 27 };
+	const TensorShape AlexL2_FilterShape	= { 256, 96, 5, 5 };
+	const ConvLayerArgs AlexL2_ConvArgs		= { 2, 2, 1, 1, false };
+
+	const TensorShape AlexL3_InShape		= { 1, 256, 27, 27 };
+	const TensorShape AlexL3_FilterShape	= { 384, 256, 3, 3 };
+	const ConvLayerArgs AlexL3_ConvArgs		= { 1, 1, 1, 1, false };
+
+	const TensorShape AlexL4_InShape		= { 1, 256, 27, 27 };
+	const TensorShape AlexL4_FilterShape	= { 384, 256, 3, 3 };
+	const ConvLayerArgs AlexL4_ConvArgs		= { 1, 1, 1, 1, false };
+
+	const TensorShape AlexL5_InShape		= { 1, 384, 13, 13 };
+	const TensorShape AlexL5_FilterShape	= { 256, 256, 3, 3 };
+	const ConvLayerArgs AlexL5_ConvArgs		= { 1, 1, 1, 1, false };
+
+	const TensorShape AlexL6_InShape		= { 1, 265, 13, 13 };
+	const TensorShape AlexL6_FilterShape	= { 265, 265, 3, 3 };
+	const ConvLayerArgs AlexL6_ConvArgs		= { 1, 1, 1, 1, false };
+
 	extern int runCpuConv (int argc, char ** argv);
 
 	extern int executeCpuConv (TensorShape iShape, TensorShape fShape, 
