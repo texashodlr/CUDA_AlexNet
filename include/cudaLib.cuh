@@ -167,7 +167,7 @@
 	 */
 	extern int runGpuConv (int argc, char ** argv);
 
-	extern int executeGpuConv(TensorShape iShape, TensorShape fShape,
+	extern uint64_t executeGpuConv(TensorShape iShape, TensorShape fShape,
 		TensorShape& oShape, ConvLayerArgs args);
 	/**
 	 * @brief 
@@ -212,17 +212,36 @@
 	extern __global__ void convLayer_gpu_SM_DM_v3(float* input, TensorShape iShape,
 		float* filter, TensorShape fShape,
 		float* bias, float* output, TensorShape oShape,
-		ConvLayerArgs args);
+		ConvLayerArgs args, int TILE_SIZE);
+
+	extern __global__ void convLayer_gpu_SM_DM_v4(float* input, TensorShape iShape,
+		float* filter, TensorShape fShape,
+		float* bias, float* output, TensorShape oShape,
+		ConvLayerArgs args, int TILE_SIZE);
 
 	extern int runGpuGemm (int argc, char ** argv);
 
-	extern int gemmLayer_gpu (float * a, TensorShape aShape, 
+	extern __global__ void gemmLayer_gpu (float * a, TensorShape aShape, 
 		float * b, TensorShape bShape,
-		float * c, TensorShape cShape,
-		GemmLayerArgs args);
+		float * c, TensorShape cShape);
+
+	extern __global__ void gemmLayer_gpu_speed(float* a, TensorShape aShape,
+		float* b, TensorShape bShape,
+		float* c, TensorShape cShape);
+
+	extern __global__ void gemmLayer_gpu_v2(float* a, TensorShape aShape,
+		float* b, TensorShape bShape,
+		float* c, TensorShape cShape);
 
 	extern int runGpuGemm (int argc, char ** argv);
 
-	extern int evaluateGpuGemm ();
+	extern int evaluateGpuGemm_copy(TensorShape aShape, TensorShape bShape,
+		TensorShape & cShape, GemmLayerArgs args, uint32_t BatchSize);
+
+	extern int evaluateGpuGemm_copy_speed(TensorShape aShape, TensorShape bShape,
+		TensorShape& cShape, GemmLayerArgs args, uint32_t BatchSize);
+
+	extern int evaluateGpuGemm_uvm(TensorShape aShape, TensorShape bShape,
+		TensorShape & cShape, GemmLayerArgs args, uint32_t BatchSize);
 
 #endif

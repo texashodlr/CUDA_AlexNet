@@ -435,6 +435,32 @@ int makeTensor (float ** t, TensorShape & shape) {
 	return 0;
 }
 
+
+int makeTensor_uvm(float** t, TensorShape& shape) {
+
+	float* m = *t;
+	uint64_t offset;
+
+	//std::random_device random_device;
+	//std::uniform_real_distribution<float> dist(0.0, 1.0);
+	std::mt19937 rng(200);
+	std::uniform_real_distribution<float> dist(0.0, 1.0);
+
+	//	Implement NCHW layout
+	for (uint32_t count = 0; count < shape.count; ++count) {
+		for (uint32_t chIdx = 0; chIdx < shape.channels; ++chIdx) {
+			for (uint32_t rowIdx = 0; rowIdx < shape.height; ++rowIdx) {
+				for (uint32_t colIdx = 0; colIdx < shape.width; ++colIdx) {
+					offset = count * shape.channels * shape.height * shape.width + chIdx * shape.height * shape.width + rowIdx * shape.width + colIdx;
+					m[offset] = dist(rng);
+				}
+			}
+		}
+	}
+	return 0;
+}
+
+
 int makeVector (float ** v, uint64_t size) {
 	if (*v != nullptr) {
 		std::cout << "Pointer already points to memory ! \n";
@@ -640,10 +666,42 @@ int runCpuGemm (int argc, char ** argv) {
 	return 0;
 }
 
-int executeCpuGemm (TensorShape aShape, TensorShape bShape, 
-	TensorShape & cShape, GemmLayerArgs args) {
+int executeCpuGemm_v1(TensorShape aShape, TensorShape bShape, 
+	TensorShape & cShape, GemmLayerArgs args, uint32_t BatchSize) {
 
 	if (aShape.width != bShape.height || aShape.channels != bShape.channels 
+		|| aShape.count != bShape.count) {
+		//std::cout << "Dimensions dont match : " << aShape << " x " << bShape << " \n";
+		//return -1;
+	}
+
+	cShape.height = aShape.height;
+	cShape.width = bShape.width;
+	cShape.channels = aShape.channels;
+	cShape.count = BatchSize;
+
+	float * a = nullptr;
+	float * b = nullptr;
+
+	makeTensor(& a, aShape);
+	makeTensor(& b, bShape);
+
+	float * c = (float *) malloc(tensorSize(cShape) * sizeof(float));
+
+	auto start = std::chrono::high_resolution_clock::now();
+	gemmLayer_cpu(a, aShape, b, bShape, c, cShape, args);
+	auto end = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> elapsed = end - start;
+	std::cout << "CPU execution time: " << elapsed.count() << " seconds\n";
+
+	return 0;
+}
+
+
+int executeCpuGemm(TensorShape aShape, TensorShape bShape,
+	TensorShape& cShape, GemmLayerArgs args) {
+
+	if (aShape.width != bShape.height || aShape.channels != bShape.channels
 		|| aShape.count != bShape.count) {
 		std::cout << "Dimensions dont match : " << aShape << " x " << bShape << " \n";
 		return -1;
@@ -654,15 +712,19 @@ int executeCpuGemm (TensorShape aShape, TensorShape bShape,
 	cShape.channels = aShape.channels;
 	cShape.count = aShape.count;
 
-	float * a = nullptr;
-	float * b = nullptr;
+	float* a = nullptr;
+	float* b = nullptr;
 
-	makeTensor(& a, aShape);
-	makeTensor(& b, bShape);
+	makeTensor(&a, aShape);
+	makeTensor(&b, bShape);
 
-	float * c = (float *) malloc(tensorSize(cShape) * sizeof(float));
+	float* c = (float*)malloc(tensorSize(cShape) * sizeof(float));
 
-	gemmLayer_cpu (a, aShape, b, bShape, c, cShape, args);
+	auto start = std::chrono::high_resolution_clock::now();
+	gemmLayer_cpu(a, aShape, b, bShape, c, cShape, args);
+	auto end = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> elapsed = end - start;
+	std::cout << "CPU execution time: " << elapsed.count() << " seconds\n";
 
 	return 0;
 }
