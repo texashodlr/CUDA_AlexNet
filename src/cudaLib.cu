@@ -94,84 +94,11 @@ int runGpuConv (int argc, char ** argv) {
 	TensorShape iShape = AlexL1_InShape;
 	TensorShape fShape = AlexL1_FilterShape;
 	ConvLayerArgs convArgs = AlexL1_ConvArgs;
-	
-	
-	int maxSharedMemPerBlock;
-	cudaDeviceGetAttribute(&maxSharedMemPerBlock, cudaDevAttrMaxSharedMemoryPerBlock, 0);
-	std::cout << "Max shared memory per block: " << maxSharedMemPerBlock << "\n";
-
-
-	int choice; 
-
-	std::cout << "Which Layer do you want, choose 1-6!\n";
-	std::cin >> choice;
-
-	std::cout << "\n";
-	std::cout << "Choice selected - " << choice << "\n\n";
-	switch (choice) {
-
-		case 1:
-			std::cout << "Running Alex Net L1!\n";
-			iShape = AlexL1_InShape;
-			fShape = AlexL1_FilterShape;
-			convArgs = AlexL1_ConvArgs;
-			break;
-		case 2:
-			std::cout << "Running Alex Net L2!\n";
-			iShape = AlexL2_InShape;
-			fShape = AlexL2_FilterShape;
-			convArgs = AlexL2_ConvArgs;
-			break;
-		case 3:
-			std::cout << "Running Alex Net L3!\n";
-			iShape = AlexL3_InShape;
-			fShape = AlexL3_FilterShape;
-			convArgs = AlexL3_ConvArgs;
-			break;
-		case 4:
-			std::cout << "Running Alex Net L4!\n";
-			iShape = AlexL4_InShape;
-			fShape = AlexL4_FilterShape;
-			convArgs = AlexL4_ConvArgs;
-			break;
-		case 5:
-			std::cout << "Running Alex Net L5!\n";
-			iShape = AlexL5_InShape;
-			fShape = AlexL5_FilterShape;
-			convArgs = AlexL5_ConvArgs;
-			break;
-		case 6:
-			std::cout << "Running Alex Net L6!\n";
-			iShape = AlexL6_InShape;
-			fShape = AlexL6_FilterShape;
-			convArgs = AlexL6_ConvArgs;
-			break;
-		default:
-			std::cout << "Defaulting to running Alex Net L1!\n";
-			iShape = AlexL1_InShape;
-			fShape = AlexL1_FilterShape;
-			convArgs = AlexL1_ConvArgs;
-			break;
-
-	}
-
-	std::cout << "Evaluate convolution : \n";
-	std::cout << "Input : " << iShape << " \n";
-	std::cout << "Filter : " << fShape << " \n";
 
 	TensorShape oShape;
-
-	/*
-	
-	float* gpu_out = executeGpuConv(iShape, fShape, oShape, convArgs);
-	float* cpu_out = executeCpuConv(iShape, fShape, oShape, convArgs);
-	verifyVector_convLayer(cpu_out, gpu_out, )
-	
-	*/
-	evaluateGpuConv(iShape, fShape, oShape, convArgs);
-	
-	//uint64_t errorCount = evaluateGpuConv(iShape, fShape, oShape, convArgs);
-	//std::cout << "Found " << errorCount << " / " << tensorSize(oShape) << " errors \n";
+			
+	uint64_t errorCount = evaluateGpuConv(iShape, fShape, oShape, convArgs);
+	std::cout << "Found " << errorCount << " / " << tensorSize(oShape) << " errors \n";
 	return 0;
 }
 
@@ -205,7 +132,7 @@ uint64_t executeGpuConv(TensorShape iShape, TensorShape fShape,
 		return 99;
 	}
 
-	std::cout << "OutShape : " << oShape << " \n";
+	//std::cout << "OutShape : " << oShape << " \n";
 	h_out = (float*)malloc(tensorSize(oShape) * sizeof(float));
 
 	/*CUDA Malloc for in, out, filter and bias*/
@@ -225,7 +152,7 @@ uint64_t executeGpuConv(TensorShape iShape, TensorShape fShape,
 	const int max_floats = 49152 / (4 * iShape.channels); //Sized for my 4070/v100
 	const int max_tile_dim = std::floor(std::sqrt(max_floats)) - fShape.height + 1;
 	const int oShape_dims = std::min(oShape.height, oShape.width);
-	std::cout << "Sizing options: Max_tile_dim: " << max_tile_dim << " | oShape_dims: " << oShape_dims << "\n";
+	//std::cout << "Sizing options: Max_tile_dim: " << max_tile_dim << " | oShape_dims: " << oShape_dims << "\n";
 	int TILE_SIZE = std::min(max_tile_dim, oShape_dims);
 	
 	if (TILE_SIZE > 15) {
@@ -244,11 +171,19 @@ uint64_t executeGpuConv(TensorShape iShape, TensorShape fShape,
 
 	/*ConvLayer Kernel Call*/
 	//convLayer_gpu << <gridDim, blockDim >> > (d_in, iShape, d_filter, fShape, d_bias, d_out, oShape, args);
-	std::cout << "\n\n GPU Starting!\n\n\n";
-	std::cout << "Bias[0] = " << h_bias[0] << "\n";
-	std::cout << "Memory Size: " << sharedMemSize << " Bytes! \n";
+	//std::cout << "\n\n GPU Starting!\n\n\n";
+	//std::cout << "Bias[0] = " << h_bias[0] << "\n";
+	//std::cout << "Memory Size: " << sharedMemSize << " Bytes! \n";
+	//convLayer_gpu << <gridDim, blockDim >> > (d_in, iShape, d_filter, fShape, d_bias, d_out, oShape, args);
+
+	auto start = std::chrono::high_resolution_clock::now();
 	//convLayer_gpu << <gridDim, blockDim >> > (d_in, iShape, d_filter, fShape, d_bias, d_out, oShape, args);
 	convLayer_gpu_SM_DM_v3 << <gridDim, blockDim, sharedMemSize >> > (d_in, iShape, d_filter, fShape, d_bias, d_out, oShape, args, TILE_SIZE);
+	auto end = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> elapsed = end - start;
+	std::cout << "GPU execution time: " << elapsed.count() << " seconds\n";
+
+	
 	cudaError_t err = cudaGetLastError();
 	if (err != cudaSuccess) {
 		std::cout << "Kernel Launch Error: " << cudaGetErrorString(err) << "\n";
@@ -261,7 +196,7 @@ uint64_t executeGpuConv(TensorShape iShape, TensorShape fShape,
 	/*CUDA memcpy for d_out to d_in*/
 	cudaMemcpy(h_out, d_out, tensorSize(oShape) * sizeof(float), cudaMemcpyDeviceToHost);
 
-	std::cout << "\n Comparing CPU and GPU now...\n";
+	//std::cout << "\n Comparing CPU and GPU now...\n";
 
 	float* cpu_out = executeCpuConv2(iShape, fShape, oShape, args);
 	uint64_t verify_errors = verifyVector_convLayer(cpu_out, h_out, (oShape.height * oShape.width * oShape.channels));
@@ -292,7 +227,7 @@ uint64_t evaluateGpuConv (TensorShape iShape, TensorShape fShape,
 		//	STUDENT: Verify number of errors in ouput matrix generated by convLayer_gpu
 		//	STUDENT: Compare results with CPU output
 		//	STUDENT: Return error count
-
+	errorCount = executeGpuConv(iShape, fShape, oShape, args);
 
 	#endif
 
@@ -361,12 +296,11 @@ __global__ void convLayer_gpu_SM_DM_v3(float* input, TensorShape iShape, float* 
 	//int coop_tid = tidy * TILE_SIZE + tidx;
 	int total_threads = TILE_SIZE * TILE_SIZE;			  // 6*6  = 36
 	//int threads_per_channel = total_threads / tile_depth; // 36/3 = 12
-	int elements_per_channel = (tile_height * tile_width); // 961+12-1/12 = 81, 972 elements will be loaded 12*81 but the last 11 are counted
+	int elements_per_channel = (tile_height * tile_width); 
 	int total_elements = tile_depth * elements_per_channel;
 
-	if (threadblock_thread_id == 0 && blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0) {
-		printf("Block (0, 0, 0): Expected shared memory = %d bytes\n", total_elements * 4);
-	}
+	//if (threadblock_thread_id == 0 && blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0) {
+		//printf("Block (0, 0, 0): Expected shared memory = %d bytes\n", total_elements * 4);}
 
 	/*Cooperative Loading*/
 	for (int idx = threadblock_thread_id; idx < total_elements; idx += total_threads) {
@@ -379,6 +313,8 @@ __global__ void convLayer_gpu_SM_DM_v3(float* input, TensorShape iShape, float* 
 		// Incorporate any padding in the index calculation if needed.
 		int input_x = base_x + coop_x; // PAD ?
 		int input_y = base_y + coop_y; // PAD ?
+		//int input_x = base_x + coop_x + args.padW;
+		//int input_y = base_y + coop_y + args.padH;
 
 		int shared_idx = (c * tile_height * tile_width) + coop_y * tile_width + coop_x;
 		//printf("Channel: %d | Input_x: %d | Input_y: %d\n", c, input_x, input_y);
@@ -396,12 +332,12 @@ __global__ void convLayer_gpu_SM_DM_v3(float* input, TensorShape iShape, float* 
 	}
 
 	__syncthreads();
-	// Debug: Confirm execution
-	if (blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0 && threadblock_thread_id == 0) {
-		printf("Block (0, 0, 0): Loading completed\n");
-	}
 
-	// Compute output
+	// Debug: Confirm execution
+	//if (blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0 && threadblock_thread_id == 0) {
+		//printf("Block (0, 0, 0): Loading completed\n");	}
+
+	// Output computing, somewhat similar to CPU/GM
 	if (out_x < oShape.width && out_y < oShape.height) {
 		uint32_t out_idx = (out_z * oShape.height + out_y) * oShape.width + out_x;
 		float shared_sum = bias[out_z];
@@ -414,48 +350,48 @@ __global__ void convLayer_gpu_SM_DM_v3(float* input, TensorShape iShape, float* 
 					int in_y = out_y * args.strideH + i;
 					int tile_x = in_x - base_x;
 					int tile_y = in_y - base_y;
-
+					
+					//Bounds check with input shape
 					if (in_x < iShape.width && in_y < iShape.height) {
 						uint32_t shared_idx = k * tile_height * tile_width + tile_y * tile_width + tile_x;
 						uint32_t filter_idx = (out_z * fShape.channels + k) * fShape.height * fShape.width + i * fShape.width + j;
 						channel_sum += tile[shared_idx] * filter[filter_idx];
-						/*
-						
-						if (out_x == 3 && out_y == 0 && out_z == 0) {
-							printf("Channel %d contribution: %f, Running sum: %f | Filter_H: %u | Filter_W: %u | Shared_IDX: %u | Filter_idx: %u\n",
-								k, channel_sum, shared_sum, i, j, shared_idx, filter_idx);
-							printf("\tBounds: in_x = %d | base_x = %d | in_y = %d | base_y = %d  && iS.w = %u | iS.h = %u ### tile_x = %d | tile_y = %d && tile_width = %d | tile_height = %d\n Filter_H: %u | Filter_W: %u\n ",
-								in_x, base_x, in_y, base_y, iShape.width, iShape.height, tile_x, tile_y, (in_x + tile_width), (in_y + tile_height), i, j);
-						}
-						
-						*/
 					}
 				}
 			}
 			shared_sum += channel_sum;
 		}
 		output[out_idx] = shared_sum;
+		//Relu again-lu
+		if (args.activation) {
+			output[out_idx] = fmaxf(0.0f, output[out_idx]);
+		}
 	}
 
 }
 
 int runGpuGemm (int argc, char ** argv) {
 
-	
-	uint32_t BatchSize = 1;
-	uint32_t fcc = 8192;
-	//TensorShape aShape = { BatchSize, 1, 6, 4 };
-	//TensorShape bShape = { 1, 1, 4, 8 };
-	TensorShape aShape = { BatchSize, 1, 1, fcc };
-	TensorShape bShape = { 1, 1, fcc, fcc };
+	//executeCpuGemm_v1(aShape, bShape, cShape, args, BatchSize);
+	uint32_t BatchSize = 3;
+	TensorShape aShape = { BatchSize, 1, 1, 4096 };
+	TensorShape bShape = { 1, 1, 4096, 4096 };
 	TensorShape cShape;
 	GemmLayerArgs args = { 2, 2, 1 };
 
-	evaluateGpuGemm_copy_speed(aShape, bShape, cShape, args, BatchSize);
-	evaluateGpuGemm_copy(aShape, bShape, cShape, args, BatchSize);
-	evaluateGpuGemm_uvm(aShape, bShape, cShape, args, BatchSize);
-	executeCpuGemm_v1(aShape, bShape, cShape, args, BatchSize);
-	return 0;
+	std::cout << "Executing GPU COPY GEMM with BatchSize: " << BatchSize << "\n";
+	float* gpu_copy = evaluateGpuGemm_copy_speed2(aShape, bShape, cShape, args, BatchSize);
+	//evaluateGpuGemm_copy_speed(aShape, bShape, cShape, args, BatchSize);
+
+	std::cout << "Executing GPU UVM GEMM with BatchSize: " << BatchSize << "\n";
+	float* gpu_uvm = evaluateGpuGemm_uvm2(aShape, bShape, cShape, args, BatchSize);
+	
+	float* cpu_gemm = executeCpuGemm_v3(aShape, bShape, cShape, args);
+	int errorCount = 0;
+
+	errorCount = verifyVector_gemm(gpu_copy, gpu_uvm, cpu_gemm, (aShape.count*aShape.channels*aShape.height*bShape.width));
+	std::cout << "\nFound " << errorCount << " Errors...\n";
+	return errorCount;
 }
 
 
@@ -464,32 +400,15 @@ __global__ void gemmLayer_gpu_speed(float* a, TensorShape aShape,	float* b, Tens
 	extern __shared__ float shared[];
 	float* Mds = shared;
 	float* Nds = shared + GEMM_TILE_SIZE * GEMM_TILE_SIZE;
-
 	int bx = blockIdx.x;
 	//int by = blockIdx.y;
 	int bz = blockIdx.z;
-
 	int tx = threadIdx.x;
 	int ty = threadIdx.y;
-
 	int Row		= bz;
 	int Col		= bx * GEMM_TILE_SIZE + tx;
-
 	float pVal = 0;
 	int Width = aShape.width; //Inner Mat Dim
-
-	//Preloading Nds (filter)
-	/*
-	
-	if (ty == 0 && tx < GEMM_TILE_SIZE && Col < bShape.width) {
-		for (int k = 0; k < GEMM_TILE_SIZE; k++) {
-			Nds[k * GEMM_TILE_SIZE + tx] = b[k * bShape.width + Col];
-		}
-	}
-	__syncthreads();
-	
-	*/
-
 	if (Row < aShape.count) {
 		for (int p_idx = 0; p_idx < (Width + GEMM_TILE_SIZE - 1) / GEMM_TILE_SIZE; ++p_idx) {
 
@@ -502,7 +421,6 @@ __global__ void gemmLayer_gpu_speed(float* a, TensorShape aShape,	float* b, Tens
 					Nds[ty * GEMM_TILE_SIZE + tx] = 0.0f;
 				}
 			}
-
 			//Loading A into Mds
 			if (ty < GEMM_TILE_SIZE && (p_idx * GEMM_TILE_SIZE + tx) < aShape.width) {
 				Mds[ty*GEMM_TILE_SIZE+tx] = a[Row * Width + p_idx * GEMM_TILE_SIZE + tx];
@@ -510,9 +428,7 @@ __global__ void gemmLayer_gpu_speed(float* a, TensorShape aShape,	float* b, Tens
 			else {
 				Mds[ty * GEMM_TILE_SIZE + tx] = 0.0f;
 			}
-
 			__syncthreads();
-
 			for (int k = 0; k < GEMM_TILE_SIZE; ++k) {
 				pVal += Mds[ty * GEMM_TILE_SIZE + k] * Nds[k*GEMM_TILE_SIZE+tx];
 			}
@@ -533,19 +449,14 @@ __global__ void gemmLayer_gpu_v2(float* a, TensorShape aShape, float* b, TensorS
 	int bx = blockIdx.x;
 	//int by = blockIdx.y;
 	int bz = blockIdx.z; //Batching idx 0:2
-
-
 	int tx = threadIdx.x;
 	int ty = threadIdx.y;
-
 	int Row = bz;
 	int Col = bx * GEMM_TILE_SIZE + tx;
-
 	float pVal = 0;
 	int Width = aShape.width; //Inner Mat Dim
 	if (Row < aShape.count) {
 		for (int p_idx = 0; p_idx < (Width + GEMM_TILE_SIZE - 1) / GEMM_TILE_SIZE; ++p_idx) {
-
 			//Loading A into Mds
 			if (ty < GEMM_TILE_SIZE && (p_idx * GEMM_TILE_SIZE + tx) < aShape.width) {
 				Mds[ty][tx] = a[Row * Width + p_idx * GEMM_TILE_SIZE + tx];
@@ -553,7 +464,6 @@ __global__ void gemmLayer_gpu_v2(float* a, TensorShape aShape, float* b, TensorS
 			else {
 				Mds[ty][tx] = 0.0f;
 			}
-
 			//Loading B into Nds
 			if (Col < bShape.width && (p_idx * GEMM_TILE_SIZE + ty) < bShape.height) {
 				Nds[ty][tx] = b[(p_idx * GEMM_TILE_SIZE + ty) * bShape.width + Col];
@@ -561,9 +471,7 @@ __global__ void gemmLayer_gpu_v2(float* a, TensorShape aShape, float* b, TensorS
 			else {
 				Nds[ty][tx] = 0.0f;
 			}
-
 			__syncthreads();
-
 			for (int k = 0; k < GEMM_TILE_SIZE; ++k) {
 				pVal += Mds[ty][k] * Nds[k][tx];
 			}
@@ -580,23 +488,17 @@ __global__ void gemmLayer_gpu(float* a, TensorShape aShape, float* b, TensorShap
 	float* c, TensorShape cShape) {
 	__shared__ float Mds[GEMM_TILE_SIZE][GEMM_TILE_SIZE];
 	__shared__ float Nds[GEMM_TILE_SIZE][GEMM_TILE_SIZE];
-
 	int bx = blockIdx.x;
 	//int by = blockIdx.y;
 	int bz = blockIdx.z; //Batching idx 0:2
-
-
 	int tx = threadIdx.x;
 	int ty = threadIdx.y;
-
 	int Row = bz;
 	int Col = bx * GEMM_TILE_SIZE + tx;
-
 	float pVal = 0;
 	int Width = aShape.width; //Inner Mat Dim
 	if (Row < aShape.count) {
 		for (int p_idx = 0; p_idx < (Width + GEMM_TILE_SIZE - 1) / GEMM_TILE_SIZE; ++p_idx) {
-
 			//Loading A into Mds
 			if (ty < GEMM_TILE_SIZE && (p_idx * GEMM_TILE_SIZE + tx) < aShape.width) {
 				Mds[ty][tx] = a[Row * Width + p_idx * GEMM_TILE_SIZE + tx];
@@ -604,7 +506,6 @@ __global__ void gemmLayer_gpu(float* a, TensorShape aShape, float* b, TensorShap
 			else {
 				Mds[ty][tx] = 0.0f;
 			}
-
 			//Loading B into Nds
 			if (Col < bShape.width && (p_idx * GEMM_TILE_SIZE + ty) < bShape.height) {
 				Nds[ty][tx] = b[(p_idx * GEMM_TILE_SIZE + ty) * bShape.width + Col];
@@ -612,14 +513,11 @@ __global__ void gemmLayer_gpu(float* a, TensorShape aShape, float* b, TensorShap
 			else {
 				Nds[ty][tx] = 0.0f;
 			}
-
 			__syncthreads();
-
 			for (int k = 0; k < GEMM_TILE_SIZE; ++k) {
 				pVal += Mds[ty][k] * Nds[k][tx];
 			}
 			__syncthreads();
-
 		}
 		if (ty == 0 && Col < cShape.width) {
 			c[Row * cShape.width + Col] = pVal;
@@ -629,8 +527,6 @@ __global__ void gemmLayer_gpu(float* a, TensorShape aShape, float* b, TensorShap
 
 int evaluateGpuGemm_copy_speed(TensorShape aShape, TensorShape bShape,
 	TensorShape& cShape, GemmLayerArgs args, uint32_t BatchSize) {
-
-	//cShape = { BatchSize, 1, 1, 4096 };
 
 	cShape.height = aShape.height;
 	cShape.width = bShape.width;
@@ -672,17 +568,21 @@ int evaluateGpuGemm_copy_speed(TensorShape aShape, TensorShape bShape,
 	dim3 gridDim((cShape.width + GEMM_TILE_SIZE - 1) / GEMM_TILE_SIZE, 1, cShape.count); // 128x1x3
 	size_t sharedMemSize = 2 * GEMM_TILE_SIZE * GEMM_TILE_SIZE * sizeof(float);
 
-	std::cout << "SPEED(?) COPY GPU Starting!\n";
-	cudaEvent_t start, stop;
-	cudaEventCreate(&start); cudaEventCreate(&stop);
-	cudaEventRecord(start);
+	std::cout << "'Speed-up' COPY GPU Starting!\n";
+	cudaEvent_t start1, stop1;
+	cudaEventCreate(&start1); cudaEventCreate(&stop1);
+	cudaEventRecord(start1);
 	std::cout << "\tMemory Size: " << sharedMemSize << " Bytes! \n";
-	gemmLayer_gpu_speed << <gridDim, blockDim, sharedMemSize>> > (d_a, aShape, d_b, bShape, d_c, cShape);
+	auto start = std::chrono::high_resolution_clock::now();
+	gemmLayer_gpu_speed << <gridDim, blockDim, sharedMemSize >> > (d_a, aShape, d_b, bShape, d_c, cShape);
+	auto end = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> elapsed = end - start;
+	std::cout << "GPU execution time: " << elapsed.count() << " seconds\n";
 	//gemmLayer_gpu_v2 << <gridDim, blockDim >> > (d_a, aShape, d_b, bShape, d_c, cShape);
-	cudaEventRecord(stop);
-	cudaEventSynchronize(stop);
-	float ms; cudaEventElapsedTime(&ms, start, stop);
-	std::cout << "Copy Batch " << BatchSize << " Time: " << ms << " ms\n";
+	cudaEventRecord(stop1);
+	cudaEventSynchronize(stop1);
+	float ms; cudaEventElapsedTime(&ms, start1, stop1);
+	std::cout << "'Speed-up' COPY Batch " << BatchSize << " Time: " << ms << " ms\n";
 	cudaError_t err = cudaGetLastError();
 	if (err != cudaSuccess) {
 		std::cout << "Kernel Launch Error: " << cudaGetErrorString(err) << "\n";
@@ -705,6 +605,88 @@ int evaluateGpuGemm_copy_speed(TensorShape aShape, TensorShape bShape,
 	free(h_c);
 
 	return 0;
+}
+
+float* evaluateGpuGemm_copy_speed2(TensorShape aShape, TensorShape bShape,
+	TensorShape& cShape, GemmLayerArgs args, uint32_t BatchSize) {
+
+	cShape.height = aShape.height;
+	cShape.width = bShape.width;
+	cShape.channels = aShape.channels;
+	cShape.count = BatchSize;
+
+	float* h_a = nullptr;
+	float* h_b = nullptr;
+
+	int retVal;
+	retVal = makeTensor(&h_a, aShape);
+	if (retVal != 0) {
+		std::cout << "Unable to make tensor \n";
+		//return -1;
+	}
+	retVal = makeTensor(&h_b, bShape);
+	if (retVal != 0) {
+		std::cout << "Unable to make tensor \n";
+		//return -1;
+	}
+
+	/*C (out) Array initialization*/
+	float* h_c = (float*)malloc(tensorSize(cShape) * sizeof(float));
+
+	/*CUDA Malloc for in, out, filter and bias*/
+
+	float* d_a, * d_b, * d_c;
+	cudaMalloc(&d_a, tensorSize(aShape) * sizeof(float));
+	cudaMalloc(&d_b, tensorSize(bShape) * sizeof(float));
+	cudaMalloc(&d_c, tensorSize(cShape) * sizeof(float));
+
+	/*CUDA Memcpy for in, filter and bias*/
+	cudaMemcpy(d_a, h_a, tensorSize(aShape) * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_b, h_b, tensorSize(bShape) * sizeof(float), cudaMemcpyHostToDevice);
+
+
+	/*Block and Grid Dims*/
+	dim3 blockDim(GEMM_TILE_SIZE, GEMM_TILE_SIZE);
+	dim3 gridDim((cShape.width + GEMM_TILE_SIZE - 1) / GEMM_TILE_SIZE, 1, cShape.count); // 128x1x3
+	size_t sharedMemSize = 2 * GEMM_TILE_SIZE * GEMM_TILE_SIZE * sizeof(float);
+
+	std::cout << "'Speed-up' COPY GPU Starting!\n";
+	cudaEvent_t start1, stop1;
+	cudaEventCreate(&start1); cudaEventCreate(&stop1);
+	cudaEventRecord(start1);
+	std::cout << "\tMemory Size: " << sharedMemSize << " Bytes! \n";
+	auto start = std::chrono::high_resolution_clock::now();
+	gemmLayer_gpu_speed << <gridDim, blockDim, sharedMemSize >> > (d_a, aShape, d_b, bShape, d_c, cShape);
+	auto end = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> elapsed = end - start;
+	std::cout << "GPU execution time: " << elapsed.count() << " seconds\n";
+	//gemmLayer_gpu_v2 << <gridDim, blockDim >> > (d_a, aShape, d_b, bShape, d_c, cShape);
+	cudaEventRecord(stop1);
+	cudaEventSynchronize(stop1);
+	float ms; cudaEventElapsedTime(&ms, start1, stop1);
+	std::cout << "'Speed-up' COPY Batch " << BatchSize << " Time: " << ms << " ms\n";
+	cudaError_t err = cudaGetLastError();
+	if (err != cudaSuccess) {
+		std::cout << "Kernel Launch Error: " << cudaGetErrorString(err) << "\n";
+	}
+	err = cudaDeviceSynchronize();
+	if (err != cudaSuccess) {
+		std::cout << "CUDA Error: " << cudaGetErrorString(err) << "\n";
+	}
+
+	cudaMemcpy(h_c, d_c, tensorSize(cShape) * sizeof(float), cudaMemcpyDeviceToHost);
+
+	/* cudaFree() functions */
+	cudaFree(d_a);
+	cudaFree(d_b);
+	cudaFree(d_c);
+
+	/*CPU Free*/
+	free(h_a);
+	free(h_b);
+	//free(h_c);
+
+	return h_c;
 }
 
 int evaluateGpuGemm_copy (TensorShape aShape, TensorShape bShape,
@@ -734,10 +716,7 @@ int evaluateGpuGemm_copy (TensorShape aShape, TensorShape bShape,
 
 	/*C (out) Array initialization*/
 	float* h_c = (float*)malloc(tensorSize(cShape) * sizeof(float));
-	std::cout << "OutShape : " << cShape << " \n";
-	
 	/*CUDA Malloc for in, out, filter and bias*/
-
 	float* d_a, * d_b, * d_c;
 	cudaMalloc(&d_a, tensorSize(aShape) * sizeof(float));
 	cudaMalloc(&d_b, tensorSize(bShape) * sizeof(float));
@@ -752,17 +731,22 @@ int evaluateGpuGemm_copy (TensorShape aShape, TensorShape bShape,
 	dim3 blockDim(GEMM_TILE_SIZE,GEMM_TILE_SIZE);
 	dim3 gridDim((cShape.width + GEMM_TILE_SIZE - 1) / GEMM_TILE_SIZE, (cShape.height + GEMM_TILE_SIZE - 1) / GEMM_TILE_SIZE);
 	
-	std::cout << "Copy GPU Starting!\n";
-	cudaEvent_t start, stop;
-	cudaEventCreate(&start); cudaEventCreate(&stop);
-	cudaEventRecord(start);
+	std::cout << "'Basic' COPY GPU Starting!\n";
+	cudaEvent_t start1, stop1;
+	cudaEventCreate(&start1); cudaEventCreate(&stop1);
+	cudaEventRecord(start1);
 	//std::cout << "Memory Size: " << sharedMemSize << " Bytes! \n";
+	auto start = std::chrono::high_resolution_clock::now();
 	gemmLayer_gpu << <gridDim, blockDim >> > (d_a, aShape, d_b, bShape, d_c, cShape);
+	auto end = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> elapsed = end - start;
+	std::cout << "GPU execution time: " << elapsed.count() << " seconds\n";
+	
 	//gemmLayer_gpu_v2 << <gridDim, blockDim >> > (d_a, aShape, d_b, bShape, d_c, cShape);
-	cudaEventRecord(stop);
-	cudaEventSynchronize(stop);
-	float ms; cudaEventElapsedTime(&ms, start, stop);
-	std::cout << "Copy Batch " << BatchSize << " Time: " << ms << " ms\n";
+	cudaEventRecord(stop1);
+	cudaEventSynchronize(stop1);
+	float ms; cudaEventElapsedTime(&ms, start1, stop1);
+	std::cout << "'Basic' COPY Batch " << BatchSize << " Time: " << ms << " ms\n";
 	cudaError_t err = cudaGetLastError();
 	if (err != cudaSuccess) {
 		std::cout << "Kernel Launch Error: " << cudaGetErrorString(err) << "\n";
@@ -785,6 +769,87 @@ int evaluateGpuGemm_copy (TensorShape aShape, TensorShape bShape,
 	free(h_c);
 
 	return 0;
+}
+
+float* evaluateGpuGemm_copy2(TensorShape aShape, TensorShape bShape,
+	TensorShape& cShape, GemmLayerArgs args, uint32_t BatchSize) {
+
+	//cShape = { BatchSize, 1, 1, 4096 };
+
+	cShape.height = aShape.height;
+	cShape.width = bShape.width;
+	cShape.channels = aShape.channels;
+	cShape.count = BatchSize;
+
+	float* h_a = nullptr;
+	float* h_b = nullptr;
+
+	int retVal;
+	retVal = makeTensor(&h_a, aShape);
+	if (retVal != 0) {
+		std::cout << "Unable to make tensor \n";
+	//	return -1;
+	}
+	retVal = makeTensor(&h_b, bShape);
+	if (retVal != 0) {
+		std::cout << "Unable to make tensor \n";
+	//	return -1;
+	}
+
+	/*C (out) Array initialization*/
+	float* h_c = (float*)malloc(tensorSize(cShape) * sizeof(float));
+	/*CUDA Malloc for in, out, filter and bias*/
+	float* d_a, * d_b, * d_c;
+	cudaMalloc(&d_a, tensorSize(aShape) * sizeof(float));
+	cudaMalloc(&d_b, tensorSize(bShape) * sizeof(float));
+	cudaMalloc(&d_c, tensorSize(cShape) * sizeof(float));
+
+	/*CUDA Memcpy for in, filter and bias*/
+	cudaMemcpy(d_a, h_a, tensorSize(aShape) * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_b, h_b, tensorSize(bShape) * sizeof(float), cudaMemcpyHostToDevice);
+
+
+	/*Block and Grid Dims*/
+	dim3 blockDim(GEMM_TILE_SIZE, GEMM_TILE_SIZE);
+	dim3 gridDim((cShape.width + GEMM_TILE_SIZE - 1) / GEMM_TILE_SIZE, (cShape.height + GEMM_TILE_SIZE - 1) / GEMM_TILE_SIZE);
+
+	std::cout << "'Basic' COPY GPU Starting!\n";
+	cudaEvent_t start1, stop1;
+	cudaEventCreate(&start1); cudaEventCreate(&stop1);
+	cudaEventRecord(start1);
+	//std::cout << "Memory Size: " << sharedMemSize << " Bytes! \n";
+	auto start = std::chrono::high_resolution_clock::now();
+	gemmLayer_gpu << <gridDim, blockDim >> > (d_a, aShape, d_b, bShape, d_c, cShape);
+	auto end = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> elapsed = end - start;
+	std::cout << "GPU execution time: " << elapsed.count() << " seconds\n";
+
+	//gemmLayer_gpu_v2 << <gridDim, blockDim >> > (d_a, aShape, d_b, bShape, d_c, cShape);
+	cudaEventRecord(stop1);
+	cudaEventSynchronize(stop1);
+	float ms; cudaEventElapsedTime(&ms, start1, stop1);
+	std::cout << "'Basic' COPY Batch " << BatchSize << " Time: " << ms << " ms\n";
+	cudaError_t err = cudaGetLastError();
+	if (err != cudaSuccess) {
+		std::cout << "Kernel Launch Error: " << cudaGetErrorString(err) << "\n";
+	}
+	err = cudaDeviceSynchronize();
+	if (err != cudaSuccess) {
+		std::cout << "CUDA Error: " << cudaGetErrorString(err) << "\n";
+	}
+
+	cudaMemcpy(h_c, d_c, tensorSize(cShape) * sizeof(float), cudaMemcpyDeviceToHost);
+
+	/* cudaFree() functions */
+	cudaFree(d_a);
+	cudaFree(d_b);
+	cudaFree(d_c);
+
+	/*CPU Free*/
+	free(h_a);
+	free(h_b);
+
+	return h_c;
 }
 
 int evaluateGpuGemm_uvm(TensorShape aShape, TensorShape bShape,
@@ -821,16 +886,87 @@ int evaluateGpuGemm_uvm(TensorShape aShape, TensorShape bShape,
 	/*Block and Grid Dims*/
 	dim3 blockDim(GEMM_TILE_SIZE, GEMM_TILE_SIZE);
 	dim3 gridDim((cShape.width + GEMM_TILE_SIZE - 1) / GEMM_TILE_SIZE, 1, cShape.count);
-	
+	size_t sharedMemSize = 2 * GEMM_TILE_SIZE * GEMM_TILE_SIZE * sizeof(float);
 
 	/*gpuGemm Kernel Call*/
 	std::cout << "UVM GPU Starting!\n";
-	cudaEvent_t start, stop;
-	cudaEventCreate(&start); cudaEventCreate(&stop);
-	cudaEventRecord(start);
-	gemmLayer_gpu_v2 << <gridDim, blockDim >> > (uvm_a, aShape, uvm_b, bShape, uvm_c, cShape);
-	cudaEventRecord(stop);
-	cudaEventSynchronize(stop);
+	cudaEvent_t start1, stop1;
+	cudaEventCreate(&start1); cudaEventCreate(&stop1);
+	cudaEventRecord(start1);
+	auto start = std::chrono::high_resolution_clock::now();
+	gemmLayer_gpu_v2 << <gridDim, blockDim, sharedMemSize >> > (uvm_a, aShape, uvm_b, bShape, uvm_c, cShape);
+	auto end = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> elapsed = end - start;
+	std::cout << "GPU execution time: " << elapsed.count() << " seconds\n";
+	cudaEventRecord(stop1);
+	cudaEventSynchronize(stop1);
+	float ms; cudaEventElapsedTime(&ms, start1, stop1);
+	std::cout << "UVM Batch " << BatchSize << " Time: " << ms << " ms\n";
+	cudaError_t err = cudaGetLastError();
+	if (err != cudaSuccess) {
+		std::cout << "Kernel Launch Error: " << cudaGetErrorString(err) << "\n";
+	}
+	err = cudaDeviceSynchronize();
+	if (err != cudaSuccess) {
+		std::cout << "CUDA Error: " << cudaGetErrorString(err) << "\n";
+	}
+	
+	cudaFree(uvm_a);
+	cudaFree(uvm_b);
+	cudaFree(uvm_c);
+	return 0;
+}
+
+float* evaluateGpuGemm_uvm2(TensorShape aShape, TensorShape bShape,
+	TensorShape& cShape, GemmLayerArgs args, uint32_t BatchSize) {
+
+	//cShape = { BatchSize, 1, 1, 4096 };
+
+	cShape.height = aShape.height;
+	cShape.width = bShape.width;
+	cShape.channels = aShape.channels;
+	cShape.count = BatchSize;
+
+	float* uvm_a = nullptr;
+	float* uvm_b = nullptr;
+	float* uvm_c = nullptr;
+
+	/*CUDA UVM Babyyy*/
+	cudaMallocManaged(&uvm_a, aShape.count * aShape.width * sizeof(float));
+	cudaMallocManaged(&uvm_b, bShape.height * bShape.width * sizeof(float));
+	cudaMallocManaged(&uvm_c, cShape.count * cShape.width * sizeof(float));
+
+	int retVal;
+	retVal = makeTensor_uvm(&uvm_a, aShape);
+	if (retVal != 0) {
+		std::cout << "Unable to make tensor \n";
+		//return -1;
+	}
+	retVal = makeTensor_uvm(&uvm_b, bShape);
+	if (retVal != 0) {
+		std::cout << "Unable to make tensor \n";
+		//return 99;
+	}
+
+	/*Block and Grid Dims*/
+	dim3 blockDim(GEMM_TILE_SIZE, GEMM_TILE_SIZE);
+	dim3 gridDim((cShape.width + GEMM_TILE_SIZE - 1) / GEMM_TILE_SIZE, 1, cShape.count);
+	size_t sharedMemSize = 2 * GEMM_TILE_SIZE * GEMM_TILE_SIZE * sizeof(float);
+
+	/*gpuGemm Kernel Call*/
+	std::cout << "UVM GPU Starting!\n";
+	cudaEvent_t start1, stop1;
+	cudaEventCreate(&start1); cudaEventCreate(&stop1);
+	cudaEventRecord(start1);
+	auto start = std::chrono::high_resolution_clock::now();
+	gemmLayer_gpu_v2 << <gridDim, blockDim, sharedMemSize >> > (uvm_a, aShape, uvm_b, bShape, uvm_c, cShape);
+	auto end = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> elapsed = end - start;
+	std::cout << "GPU execution time: " << elapsed.count() << " seconds\n";
+	cudaEventRecord(stop1);
+	cudaEventSynchronize(stop1);
+	float ms; cudaEventElapsedTime(&ms, start1, stop1);
+	std::cout << "UVM Batch " << BatchSize << " Time: " << ms << " ms\n";
 	cudaError_t err = cudaGetLastError();
 	if (err != cudaSuccess) {
 		std::cout << "Kernel Launch Error: " << cudaGetErrorString(err) << "\n";
@@ -840,15 +976,9 @@ int evaluateGpuGemm_uvm(TensorShape aShape, TensorShape bShape,
 		std::cout << "CUDA Error: " << cudaGetErrorString(err) << "\n";
 	}
 
-
-	float ms; cudaEventElapsedTime(&ms, start, stop);
-	std::cout << "UVM Batch " << BatchSize << " Time: " << ms << " ms\n";
-
 	cudaFree(uvm_a);
 	cudaFree(uvm_b);
-	cudaFree(uvm_c);
-	return 0;
+	return uvm_c;
 }
-
 
 //	STUDENT: Add functions here (No)
