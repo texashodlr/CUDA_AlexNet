@@ -1,11 +1,10 @@
 [![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/BLRicMtN)
 
-# ECE 60827 CUDA Programming Part 3
+# Alex Net in CUDA
 
-## Professor T. N. Vijaykumar <br> TA: Ni Kang
+## This project was completed within Purdue's ECE60827: Programmable Accelerator Architecture
 
-## Due on March 2, 2025
-
+Please view the complete report labeled: "Part 3 Conor Devlin.pdf"(https://github.com/texashodlr/CUDA_AlexNet/blob/main/Report%203%20-%20Conor%20Devlin.pdf)
 
 # Introduction
 
