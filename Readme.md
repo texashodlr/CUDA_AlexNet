@@ -4,7 +4,7 @@
 
 ## This project was completed within Purdue's ECE60827: Programmable Accelerator Architecture
 
-Please view the complete report labeled: "Part 3 Conor Devlin.pdf"(https://github.com/texashodlr/CUDA_AlexNet/blob/main/Report%203%20-%20Conor%20Devlin.pdf)
+Please view the complete report labeled: ["Part 3 Conor Devlin.pdf"](https://github.com/texashodlr/CUDA_AlexNet/blob/main/Report%203%20-%20Conor%20Devlin.pdf)
 
 # Introduction
 
