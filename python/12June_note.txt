@@ -1,0 +1,2 @@
+Note to self:
+	do inline py func for another cuda kernel based on the pmpp book ch1-5 and based on the cuda mode lecture series.
